@@ -1,10 +1,7 @@
 import random
 from bot_logic.cleaner import clear_phrase
-from bot_logic.nlu import IntentClassifier
 from bot_logic.dialog import get_answer_by_intent, generate_answer, get_failure_phrase, classify_intent
 from bot_logic.config import BOT_CONFIG
-
-classifier = IntentClassifier()
 
 stats = {'intent': 0, 'generate': 0, 'failure': 0}
 
@@ -16,13 +13,10 @@ ads_state = {
 def bot(reply: str):
     global ads_state
     reply = clear_phrase(reply)
-    # Увеличиваем счетчик сообщений
     ads_state['counter'] += 1
 
-    # NLU
     intent = classify_intent(reply)
 
-    # Answer generation
     if intent:
         answer = get_answer_by_intent(intent)
         if answer:

@@ -2,17 +2,17 @@ import random
 import nltk
 from sklearn.svm import LinearSVC
 from sklearn.feature_extraction.text import TfidfVectorizer
-from collections import defaultdict
 from bot_logic.cleaner import clear_phrase
 from bot_logic.config import BOT_CONFIG
+from bot_logic.nlu import get_ml_answer, get_intent
 
 X_text = []
 y = []
 
-for intent, intent_data in BOT_CONFIG['intents'].items():
-    for example in intent_data['examples']:
-        X_text.append(example)
-        y.append(intent)
+for global_intent, global_intent_data in BOT_CONFIG['intents'].items():
+    for global_example in global_intent_data['examples']:
+        X_text.append(global_example)
+        y.append(global_intent)
 
 vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(3, 3))
 X = vectorizer.fit_transform(X_text)
@@ -21,8 +21,10 @@ clf.fit(X, y)
 
 dialogues_structured = {}
 
+ads_counter = 0
+ads_next_trigger = random.randint(*BOT_CONFIG['ads_interval'])
+
 def structure_dialogues():
-    dialogues = []
     for intent, intent_data in BOT_CONFIG['intents'].items():
         for example in intent_data['examples']:
             question = clear_phrase(example)
@@ -36,13 +38,13 @@ def structure_dialogues():
 def classify_intent(replica):
     replica = clear_phrase(replica)
 
-    intent = clf.predict(vectorizer.transform([replica]))[0]
+    choice_intent = clf.predict(vectorizer.transform([replica]))[0]
 
-    for example in BOT_CONFIG['intents'][intent]['examples']:
+    for example in BOT_CONFIG['intents'][choice_intent]['examples']:
         example = clear_phrase(example)
         distance = nltk.edit_distance(replica, example)
         if example and distance / len(example) <= 0.5:
-            return intent
+            return choice_intent
 
 def get_answer_by_intent(intent):
     if intent in BOT_CONFIG['intents']:
@@ -54,33 +56,16 @@ def get_failure_phrase():
     failure_phrases = BOT_CONFIG['failure_phrases']
     return random.choice(failure_phrases)
 
+def generate_answer(user_message: str):
+    global ads_counter, ads_next_trigger
 
-def generate_answer(replica):
-    replica = clear_phrase(replica)
-    words = set(replica.split(' '))
-    mini_dataset = []
+    temp_intent = get_intent(user_message)
+    if temp_intent:
+        return random.choice(BOT_CONFIG['intents'][temp_intent]['responses'])
 
-    # Составляем мини-набор данных, собирая вопросы и ответы, соответствующие словам из реплики
-    for word in words:
-        if word in dialogues_structured:
-            mini_dataset += dialogues_structured[word]
+    ml_answer = get_ml_answer(user_message)
+    if ml_answer:
+        return ml_answer
 
-    # Убираем повторы из мини-набора данных
-    mini_dataset = list(set(mini_dataset))
-
-    answers = []  # [[distance_weighted, question, answer]]
-
-    for question, answer in mini_dataset:
-        # Если разница в длине реплики и вопроса не слишком велика, считаем расстояние Левенштейна
-        if abs(len(replica) - len(question)) / len(question) < 0.2:
-            distance = nltk.edit_distance(replica, question)
-            distance_weighted = distance / len(question)
-            if distance_weighted < 0.2:
-                answers.append([distance_weighted, question, answer])
-
-    # Если есть подходящие ответы, выбираем наиболее релевантный
-    if answers:
-        return min(answers, key=lambda three: three[0])[2]
-
-    return None
+    return random.choice(BOT_CONFIG['failure_phrases'])
 
