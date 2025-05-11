@@ -1,71 +1,53 @@
-import logging
-import os
-import tempfile
-from dotenv import load_dotenv
-from gtts import gTTS
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import speech_recognition as sr
-from bot_logic.bot import bot
-from bot_logic.dialog import structure_dialogues
-from pydub import AudioSegment
+import random
+from bot_logic.cleaner import clear_phrase
+from bot_logic.dialog import get_answer_by_intent, generate_answer, get_failure_phrase, classify_intent
+from bot_logic.config import BOT_CONFIG
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+stats = {'intent': 0, 'generate': 0, 'failure': 0}
 
-logger = logging.getLogger(__name__)
+ads_state = {
+    'counter': 0,
+    'next_ads_after': random.randint(*BOT_CONFIG['ads_interval'])
+}
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"User {update.message.from_user.id} started the bot")
-    intent_answer = bot("что ты умеешь")
-    await update.message.reply_text(f"Привет! Я бот магазина игрушек\n{intent_answer}")
+PASSIVE_HINTS = [
+    "Кстати, я могу рассказать про новинки в нашем магазине! 🎉",
+    "Если хотите — покажу лучшие предложения недели 😉",
+    "Я умею не только отвечать текстом, но и голосом! Попробуйте сказать что-нибудь 🎤",
+    "Нужна помощь с выбором подарка? Просто напишите возраст или интересы ребёнка 🎁"
+]
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"User {update.message.from_user.id} asked for help")
-    await update.message.reply_text("Я могу поболтать с вами и посоветовать игрушки 😊")
+def get_passive_hint():
+    return random.choice(PASSIVE_HINTS)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-    logger.info(f"User {update.message.from_user.id} said: {user_input}")
-    response = bot(user_input)
-    logger.info(f"Response for user: {response}")
-    await update.message.reply_text(response)
+def bot(reply: str):
+    global ads_state
+    reply = clear_phrase(reply)
+    ads_state['counter'] += 1
 
-async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    voice = update.message.voice
-    file = await voice.get_file()
+    intent = classify_intent(reply)
 
-    with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as f:
-        await file.download_to_drive(f.name)
-        ogg_path = f.name
+    if intent:
+        answer = get_answer_by_intent(intent)
+        if answer:
+            stats['intent'] += 1
+            return maybe_add_ads(answer)
 
-    wav_path = ogg_path.replace('.ogg', '.wav')
-    AudioSegment.from_ogg(ogg_path).export(wav_path, format='wav')
+    answer = generate_answer(reply)
+    if answer:
+        stats['generate'] += 1
+        return maybe_add_ads(answer)
 
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(wav_path) as source:
-        audio = recognizer.record(source)
-        try:
-            recognized_text = recognizer.recognize_google(audio, language='ru-RU')
-        except sr.UnknownValueError:
-            recognized_text = None
+    stats['failure'] += 1
+    return maybe_add_ads(get_failure_phrase())
 
-    os.remove(ogg_path)
-    os.remove(wav_path)
+def maybe_add_ads(answer):
+    global ads_state
 
-    if not recognized_text:
-        await update.message.reply_text("Извините, не смог распознать речь")
-        return
+    if ads_state['counter'] >= ads_state['next_ads_after']:
+        ads_state['counter'] = 0
+        ads_state['next_ads_after'] = random.randint(*BOT_CONFIG['ads_interval'])
+        ad = random.choice(BOT_CONFIG['ads_phrases'])
+        return f"{answer}\n\n💡 {ad}"
 
-    await update.message.reply_text(f"Вы сказали: {recognized_text}")
-    answer = bot(recognized_text)
-
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-        tts = gTTS(answer, lang='ru', slow=True)
-        tts.save(f.name)
-        voice_path = f.name
-
-    await update.message.reply_voice(voice=open(voice_path, "rb"))
-    os.remove(voice_path)
+    return answer

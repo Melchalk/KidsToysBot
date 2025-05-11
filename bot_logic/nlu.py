@@ -9,19 +9,19 @@ def load_dialogues(path='dialogues.txt'):
         content = f.read()
 
     dialogues_str = content.split('\n\n')
-    dialogues = [d.split('\n')[:2] for d in dialogues_str]
+    split_dialogues = [d.split('\n')[:2] for d in dialogues_str]
 
     dialogues_filtered = []
-    questions = set()
+    init_questions = set()
 
-    for d in dialogues:
+    for d in split_dialogues:
         if len(d) != 2:
             continue
         question = clear_phrase(d[0][2:])
         answer = d[1][2:]
 
-        if question and question not in questions:
-            questions.add(question)
+        if question and question not in init_questions:
+            init_questions.add(question)
             dialogues_filtered.append([question, answer])
 
     return dialogues_filtered
@@ -51,7 +51,6 @@ def get_ml_answer(user_text: str, threshold: float = 0.3):
     best_score = similarities[best_idx]
     best_answer = answers[best_idx]
 
-    # 🔍 Отбрасываем плохие совпадения
     if best_score < threshold:
         return None
 
