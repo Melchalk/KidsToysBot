@@ -6,10 +6,10 @@ from gtts import gTTS
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import speech_recognition as sr
-from bot_logic.handler import bot
+from bot_logic.bot import bot
 from bot_logic.dialog import structure_dialogues
 from pydub import AudioSegment
-from bot_logic.bot import start, help_command, handle_message, handle_voice
+from bot_logic.handlers import start, help_command, handle_message, handle_voice
 
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
