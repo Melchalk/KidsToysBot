@@ -1,8 +1,6 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
 from bot_logic.cleaner import clear_phrase
-from bot_logic.config import BOT_CONFIG
 
 def load_dialogues(path='dialogues.txt'):
     with open(path, 'r', encoding='utf-8') as f:
@@ -32,15 +30,6 @@ answers = [a for _, a in dialogues]
 
 vectorizer = TfidfVectorizer()
 tfidf_matrix = vectorizer.fit_transform(questions)
-
-def get_intent(user_message: str):
-    user_message = user_message.lower()
-
-    for intent_name, intent_data in BOT_CONFIG['intents'].items():
-        for example in intent_data['examples']:
-            if example.lower() in user_message:
-                return intent_name
-    return None
 
 def get_ml_answer(user_text: str, threshold: float = 0.3):
     if not questions:

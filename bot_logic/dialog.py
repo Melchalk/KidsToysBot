@@ -4,7 +4,7 @@ from sklearn.svm import LinearSVC
 from sklearn.feature_extraction.text import TfidfVectorizer
 from bot_logic.cleaner import clear_phrase
 from bot_logic.config import BOT_CONFIG
-from bot_logic.nlu import get_ml_answer, get_intent
+from bot_logic.nlu import get_ml_answer
 
 X_text = []
 y = []
@@ -58,10 +58,6 @@ def get_failure_phrase():
 
 def generate_answer(user_message: str):
     global ads_counter, ads_next_trigger
-
-    temp_intent = get_intent(user_message)
-    if temp_intent:
-        return random.choice(BOT_CONFIG['intents'][temp_intent]['responses'])
 
     ml_answer = get_ml_answer(user_message)
     if ml_answer:
